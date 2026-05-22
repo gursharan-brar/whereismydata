@@ -1014,7 +1014,7 @@ textarea {
     </div>
     <div class="top-bar-meta">
       <span class="status-dot" aria-hidden="true"></span>
-      <span class="top-bar-status">LOCAL · NO SERVER · NO TRACKING</span>
+      <span class="top-bar-status">NO ANALYTICS · NO TRACKING</span>
     </div>
   </div>
 </header>
@@ -1126,10 +1126,35 @@ textarea {
       </div>
     </div>
 
-    <!-- Policy -->
+    <!-- URL (optional, server mode) -->
     <div class="panel">
       <div class="panel-head">
         <span class="panel-num">B</span>
+        <h3 class="panel-title">Company URL <span style="font-weight:400;font-size:14px;color:var(--c-muted)">(optional)</span></h3>
+      </div>
+      <p class="panel-hint">
+        Paste the company's homepage and the server will find and fetch the privacy
+        policy for you. Leave blank to paste the text yourself below.
+      </p>
+      <div class="input-wrap">
+        <label class="visually-hidden" for="policyUrl">Company URL</label>
+        <input
+          type="text"
+          id="policyUrl"
+          placeholder="https://www.example.com"
+          autocomplete="off"
+          spellcheck="false"
+        >
+      </div>
+      <div class="panel-foot">
+        <span id="urlModeNote" class="key-status">URL mode requires the local server running. For static GitHub Pages, use the textarea.</span>
+      </div>
+    </div>
+
+    <!-- Policy -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-num">C</span>
         <h3 class="panel-title">Privacy policy text</h3>
       </div>
       <p class="panel-hint">

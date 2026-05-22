@@ -4,7 +4,9 @@
 
 [Try it live →](https://gursharan-brar.github.io/whereismydata)
 
-Paste any privacy policy. Get an A–F grade scored against PIPEDA's fair information principles. Claude does the reading, you decide what to do with it.
+Paste any privacy policy — or give the tool a URL and let it fetch the policy itself.
+Get an A–F grade scored against PIPEDA's fair information principles.
+Claude does the reading, you decide what to do with it.
 
 ![preview](docs/preview.png) <!-- add screenshot once deployed -->
 
@@ -12,7 +14,8 @@ Paste any privacy policy. Get an A–F grade scored against PIPEDA's fair inform
 
 ## Why this exists
 
-Canadian privacy policies are long, dense, and written so you won't read them. Most people scroll, click "I agree," and never find out:
+Canadian privacy policies are long, dense, and written so you won't read them.
+Most people scroll, click "I agree," and never find out:
 
 1. Where their data is stored
 2. Who else gets to see it
@@ -43,33 +46,64 @@ This tool reads the thing for you and gives you a clear, scannable answer.
 
 Each item is scored **yes** (full weight), **partial** (half), or **no** (zero).
 
+The rubric, grade boundaries, scoring prompt, and model are all defined once
+in [`rubric.json`](rubric.json) at the repo root. Both the Python backend and
+the browser JS read from this file — there is no duplication.
+
 ---
 
 ## Two ways to use it
 
-### 1. Web app — paste-and-go
+### Static mode — GitHub Pages, no install
 
 [gursharan-brar.github.io/whereismydata](https://gursharan-brar.github.io/whereismydata)
 
 - Bring your own [Anthropic API key](https://console.anthropic.com/settings/keys) ($5 signup credit covers ~500 scans)
-- Paste a policy → click scan → get graded
-- 100% in-browser. No server, no analytics, no tracking
-- Your key stays in your tab; only goes to `api.anthropic.com`
+- **Paste** a policy into the textarea → click scan → get graded
+- Your browser calls `api.anthropic.com` directly — no server in the middle
+- 100% client-side. No install, no analytics, no tracking
+- Works offline (once the page is loaded) and from `file://`
 
-### 2. Python CLI — batch scanning
+### Server mode — local or self-hosted
 
-For grading 50 policies at once. Fetches the policy text from a URL automatically.
+Adds URL fetching: give it a company homepage and the server finds and extracts
+the privacy policy text automatically. Also better for batch work.
 
 ```bash
+# Install
 pip install -r requirements.txt
+
+# Start the server
+python server.py serve
+# → http://localhost:8000
+
+# Batch scan a list of companies (writes HTML reports to reports/)
 export ANTHROPIC_API_KEY=sk-ant-...
+python server.py --batch companies.txt --out reports/
 
-# One company
-python scan.py https://www.timhortons.ca --out tims.html
-
-# A whole list
-python scan.py --batch companies.txt --out reports/
+# Scan one company from the CLI
+python server.py https://www.timhortons.ca --out tims.html
 ```
+
+Open `http://localhost:8000` in your browser. The web UI is served by the
+backend. Enter a URL in the **Company URL** field (panel B) and the server
+fetches and scores the policy for you. The textarea paste flow still works
+exactly as in static mode — the server just adds the URL option.
+
+#### Deploy to Railway (free tier)
+
+The server can be deployed to [Railway](https://railway.app) for ~$0/month on
+the hobby tier, so the URL-scanning version works publicly without anyone
+needing to run anything locally.
+
+1. Fork this repo
+2. New project → Deploy from GitHub repo
+3. Railway auto-detects the `Procfile` and runs:
+   `uvicorn server:app --host 0.0.0.0 --port $PORT`
+4. Your app is live at `<project>.up.railway.app`
+
+Users still supply their own API key via the browser UI — the server never
+holds a key.
 
 ---
 
@@ -81,9 +115,12 @@ Claude Haiku reads policies fast but it can:
 - Misread legal hedging as clarity
 - Get a status wrong on a vague disclosure
 
-**Before citing a grade publicly or making a decision based on it, read the original policy yourself.** This is a first-pass reader, not a compliance audit, and definitely not legal advice.
+**Before citing a grade publicly or making a decision based on it, read the
+original policy yourself.** This is a first-pass reader, not a compliance
+audit, and definitely not legal advice.
 
-The grading language deliberately avoids "violates PIPEDA" and uses "discloses / does not disclose clearly" — compliance is a legal call, not an AI call.
+The grading language deliberately avoids "violates PIPEDA" and uses
+"discloses / does not disclose clearly" — compliance is a legal call, not an AI call.
 
 ---
 
@@ -91,23 +128,27 @@ The grading language deliberately avoids "violates PIPEDA" and uses "discloses /
 
 ```
 whereismydata/
-├── index.html          ← web app (drops into GitHub Pages)
-├── styles.css          ← surveillance-terminal noir
-├── app.js              ← client logic, Claude API call
-├── scan.py             ← Python CLI for batch scanning
-├── companies.txt       ← starter list of 50 Canadian sites
+├── index.html          ← web app (static GitHub Pages + served by backend)
+├── app.js              ← client logic; fetches rubric from /api/rubric or rubric.json
+├── rubric.json         ← single source of truth: rubric, grades, prompt, model
+├── server.py           ← FastAPI backend + CLI (replaces scan.py)
+├── companies.txt       ← starter list of Canadian sites for batch scanning
 ├── requirements.txt    ← Python deps
+├── Procfile            ← Railway / Heroku deploy
 ├── LICENSE
 └── README.md
 ```
 
 ---
 
-## Deploy your own
+## Deploy static version (GitHub Pages)
 
 1. Fork this repo
 2. Settings → Pages → Source: `main` branch, `/` root
 3. Live at `<your-username>.github.io/whereismydata` in ~90 seconds
+
+Only `index.html`, `app.js`, and `rubric.json` are needed. Everything else
+is for the server mode.
 
 ---
 

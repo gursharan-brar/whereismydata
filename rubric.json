@@ -1,0 +1,80 @@
+{
+  "model": "claude-haiku-4-5-20251001",
+  "max_policy_chars": 60000,
+  "items": [
+    {
+      "key": "accountability",
+      "label": "Accountability",
+      "looking_for": "Names a privacy officer or contact and gives a way to reach them",
+      "weight": 10
+    },
+    {
+      "key": "purpose_identified",
+      "label": "Purpose identified",
+      "looking_for": "States WHY data is being collected, in plain language, before/at collection",
+      "weight": 10
+    },
+    {
+      "key": "consent_clear",
+      "label": "Consent is clear",
+      "looking_for": "Explains how consent is obtained and how users can withdraw it",
+      "weight": 10
+    },
+    {
+      "key": "data_minimization",
+      "label": "Data minimization",
+      "looking_for": "Limits collection to what's needed for the stated purpose — no vague 'and other data'",
+      "weight": 8
+    },
+    {
+      "key": "third_party_sharing",
+      "label": "Third-party sharing disclosed",
+      "looking_for": "Lists categories of third parties data is shared with, and why",
+      "weight": 12
+    },
+    {
+      "key": "data_location",
+      "label": "Data storage location disclosed",
+      "looking_for": "Says WHERE data is stored (Canada / US / EU / 'globally') and notes cross-border transfer",
+      "weight": 12
+    },
+    {
+      "key": "retention",
+      "label": "Retention period stated",
+      "looking_for": "Says how long data is kept, or the criteria used to decide",
+      "weight": 8
+    },
+    {
+      "key": "security",
+      "label": "Security measures described",
+      "looking_for": "Describes safeguards (encryption, access controls) in more than one generic sentence",
+      "weight": 8
+    },
+    {
+      "key": "user_rights",
+      "label": "User rights spelled out",
+      "looking_for": "Tells users how to access, correct, or delete their data, and how to complain",
+      "weight": 10
+    },
+    {
+      "key": "plain_language",
+      "label": "Plain language",
+      "looking_for": "Readable by a non-lawyer. No wall-of-text legalese. Has headings, structure",
+      "weight": 6
+    },
+    {
+      "key": "last_updated",
+      "label": "Last-updated date visible",
+      "looking_for": "Shows when the policy was last revised",
+      "weight": 6
+    }
+  ],
+  "grades": {
+    "A": 85,
+    "B": 70,
+    "C": 55,
+    "D": 40,
+    "F": 0
+  },
+  "scoring_prompt": "You are reading a privacy policy and scoring it against a rubric grounded in Canada's PIPEDA fair information principles and Alberta's PIPA.\n\nYou are NOT making a legal determination. You are checking whether the policy TEXT discloses certain things clearly. Hedge accordingly. Never write \"violates PIPEDA\" — write \"the policy does/does not disclose X clearly.\"\n\nFor each rubric item, return:\n  - status: \"yes\" (clearly addressed), \"partial\" (mentioned vaguely), or \"no\" (missing/unclear)\n  - evidence: 1-2 short quotes or paraphrases from the policy (under 15 words each)\n  - note: one short sentence explaining your call\n\nRubric:\n%RUBRIC_JSON%\n\nPrivacy policy text (may be truncated):\n---\n%POLICY_TEXT%\n---\n\nReturn ONLY valid JSON, no preamble, no markdown fences, in this exact shape:\n{\n  \"items\": {\n    \"<key>\": {\"status\": \"yes|partial|no\", \"evidence\": \"...\", \"note\": \"...\"},\n    ...\n  },\n  \"summary\": \"2-3 sentence plain-English summary of the policy's strengths and weaknesses\"\n}"
+}
