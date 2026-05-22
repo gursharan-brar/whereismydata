@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WhereIsMyData — read what they wrote about you</title>
+<meta name="description" content="An AI-assisted reader for Canadian privacy policies. Grades against PIPEDA fair information principles.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,700;9..144,900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================================================
+   WhereIsMyData
+   Aesthetic: surveillance-terminal noir
+   Type: JetBrains Mono (system/labels) + Fraunces (headlines/body)
+   =========================================================================== */
+
+:root {
+  --c-bg: #080808;
+  --c-bg-2: #0d0d0d;
+  --c-surface: #111111;
+  --c-surface-hi: #161616;
+  --c-border: rgba(255, 255, 255, 0.08);
+  --c-border-hi: rgba(255, 255, 255, 0.18);
+  --c-text: #f4f4f0;
+  --c-text-dim: #c8c8bf;
+  --c-muted: #6a6a64;
+  --c-muted-hi: #8a8a82;
+
+  /* Signal red — single accent */
+  --c-signal: #ff3344;
+  --c-signal-dim: #cc2533;
+  --c-signal-glow: rgba(255, 51, 68, 0.15);
+
+  /* Status colors — CRT-feeling, not Bootstrap */
+  --c-yes: #6fcf72;
+  --c-partial: #f0b440;
+  --c-no: #ff3344;
+
+  /* Grade colors */
+  --c-grade-a: #6fcf72;
+  --c-grade-b: #a8d96a;
+  --c-grade-c: #f0b440;
+  --c-grade-d: #f08040;
+  --c-grade-f: #ff3344;
+
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-serif: 'Fraunces', Georgia, serif;
+
+  --max: 1200px;
+  --pad-x: clamp(20px, 4vw, 48px);
+}
+
+/* ---------- Reset ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+img, svg { display: block; max-width: 100%; }
+button { font: inherit; cursor: pointer; }
+
+/* ---------- Base ---------- */
+body {
+  font-family: var(--font-serif);
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Subtle noise + radial pull */
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255, 51, 68, 0.04), transparent 60%),
+    repeating-linear-gradient(0deg, transparent 0 2px, rgba(255, 255, 255, 0.008) 2px 3px);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: var(--c-signal);
+  color: var(--c-bg);
+}
+
+/* ---------- Scanline (decorative) ---------- */
+.scanline {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(255, 51, 68, 0.03) 50%,
+    transparent 100%
+  );
+  background-size: 100% 8px;
+  z-index: 1;
+  opacity: 0.5;
+}
+
+/* ---------- Utility ---------- */
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0);
+  white-space: nowrap; border: 0;
+}
+
+main { position: relative; z-index: 2; }
+
+/* ===========================================================================
+   TOP BAR
+   =========================================================================== */
+.top-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(8, 8, 8, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--c-border);
+}
+.top-bar-inner {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 14px var(--pad-x);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.logo-mark {
+  color: var(--c-signal);
+  font-size: 14px;
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.logo-text { color: var(--c-text); }
+.top-bar-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  color: var(--c-muted-hi);
+}
+.status-dot {
+  width: 6px; height: 6px;
+  background: var(--c-yes);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--c-yes);
+}
+
+@media (max-width: 540px) {
+  .top-bar-status { display: none; }
+}
+
+/* ===========================================================================
+   HERO
+   =========================================================================== */
+.hero {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 64px var(--pad-x) 48px;
+}
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 48px;
+}
+@media (min-width: 900px) {
+  .hero-grid { grid-template-columns: 1.4fr 1fr; gap: 64px; align-items: start; }
+}
+
+.hero-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 32px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.18em;
+  color: var(--c-muted-hi);
+}
+.eyebrow-num { color: var(--c-signal); font-weight: 700; }
+.eyebrow-line {
+  flex: 1;
+  max-width: 80px;
+  height: 1px;
+  background: var(--c-border-hi);
+}
+
+.hero-headline {
+  font-family: var(--font-serif);
+  font-weight: 900;
+  font-size: clamp(40px, 8vw, 88px);
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  margin: 0 0 28px;
+  font-variation-settings: "opsz" 144;
+}
+.headline-strike {
+  position: relative;
+  color: var(--c-muted-hi);
+  font-style: italic;
+  font-weight: 500;
+}
+.headline-strike::after {
+  content: "";
+  position: absolute;
+  left: -2%;
+  right: -2%;
+  top: 52%;
+  height: 3px;
+  background: var(--c-signal);
+  transform: rotate(-1.5deg);
+}
+.headline-accent {
+  color: var(--c-signal);
+  font-style: italic;
+}
+
+.hero-sub {
+  font-size: 18px;
+  line-height: 1.55;
+  color: var(--c-text-dim);
+  max-width: 560px;
+  margin: 0 0 36px;
+}
+
+.hero-meta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--c-border);
+  border: 1px solid var(--c-border);
+  max-width: 480px;
+}
+.meta-item {
+  background: var(--c-bg);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.meta-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--c-muted);
+}
+.meta-value {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--c-text);
+}
+
+/* ---- Hero preview card ---- */
+.hero-right { position: relative; }
+.preview-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-hi);
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    0 30px 60px -20px rgba(0, 0, 0, 0.6),
+    0 0 0 1px var(--c-border) inset;
+}
+.preview-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--c-signal), transparent);
+}
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  color: var(--c-muted-hi);
+}
+.preview-dot {
+  width: 8px; height: 8px;
+  background: var(--c-signal);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--c-signal);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+.preview-grade-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px dashed var(--c-border-hi);
+}
+.preview-grade {
+  font-family: var(--font-mono);
+  font-size: 64px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.preview-grade-d { color: var(--c-grade-d); }
+.preview-grade-num {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+}
+.preview-grade-num span {
+  color: var(--c-muted);
+  font-weight: 400;
+  font-size: 14px;
+}
+.preview-grade-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--c-muted-hi);
+  letter-spacing: 0.06em;
+  margin-top: 4px;
+}
+.preview-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.preview-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--c-text-dim);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--c-border);
+}
+.preview-bar:last-of-type { border-bottom: none; }
+.bar-status {
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  padding: 3px 8px;
+}
+.bar-status.yes { color: var(--c-yes); background: rgba(111, 207, 114, 0.1); }
+.bar-status.no { color: var(--c-no); background: rgba(255, 51, 68, 0.1); }
+.bar-status.partial { color: var(--c-partial); background: rgba(240, 180, 64, 0.1); }
+
+.preview-redact {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.redact-block {
+  height: 8px;
+  background: var(--c-text);
+  width: 70%;
+  opacity: 0.9;
+}
+.redact-block-2 { width: 45%; }
+.redact-block-3 { width: 60%; }
+
+/* ===========================================================================
+   SECTION HEAD (reusable)
+   =========================================================================== */
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--c-border-hi);
+}
+.section-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--c-signal);
+}
+.section-title {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--c-text);
+  margin: 0;
+}
+.section-rule {
+  flex: 1;
+  height: 1px;
+  background: var(--c-border);
+}
+
+/* ===========================================================================
+   TOOL
+   =========================================================================== */
+.tool {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 48px var(--pad-x);
+}
+
+.panel {
+  background: var(--c-bg-2);
+  border: 1px solid var(--c-border);
+  padding: 24px;
+  margin-bottom: 20px;
+  position: relative;
+  transition: border-color 0.2s ease;
+}
+.panel:hover { border-color: var(--c-border-hi); }
+.panel:focus-within {
+  border-color: var(--c-signal);
+  box-shadow: 0 0 0 1px var(--c-signal-glow);
+}
+@media (min-width: 700px) {
+  .panel { padding: 28px 32px; }
+}
+
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+.panel-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--c-signal);
+}
+.panel-title {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--c-text);
+}
+.panel-hint {
+  font-family: var(--font-serif);
+  font-size: 14.5px;
+  color: var(--c-muted-hi);
+  margin: 0 0 18px;
+  line-height: 1.55;
+  max-width: 70ch;
+}
+.panel-hint a {
+  color: var(--c-signal);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.panel-hint a:hover { color: var(--c-signal-dim); }
+.panel-hint em {
+  font-style: italic;
+  color: var(--c-text-dim);
+}
+.panel-hint kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-hi);
+  padding: 2px 6px;
+  color: var(--c-text-dim);
+}
+
+.input-wrap { position: relative; }
+
+input[type="password"], input[type="text"], textarea {
+  width: 100%;
+  background: var(--c-bg);
+  border: 1px solid var(--c-border-hi);
+  color: var(--c-text);
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  padding: 14px 16px;
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+input[type="password"]:focus,
+input[type="text"]:focus,
+textarea:focus {
+  border-color: var(--c-signal);
+  background: var(--c-bg-2);
+}
+input::placeholder, textarea::placeholder {
+  color: var(--c-muted);
+  font-family: var(--font-mono);
+}
+
+textarea {
+  min-height: 260px;
+  resize: vertical;
+  font-family: var(--font-serif);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.panel-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.panel-actions { display: flex; gap: 14px; }
+.key-status, .char-count {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--c-muted-hi);
+  letter-spacing: 0.04em;
+}
+
+.btn-text {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  color: var(--c-signal);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s ease;
+}
+.btn-text:hover { border-bottom-color: var(--c-signal); }
+.btn-text:focus-visible {
+  outline: 2px solid var(--c-signal);
+  outline-offset: 4px;
+}
+
+/* ---- CTA ---- */
+.cta-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin: 28px 0 8px;
+  flex-wrap: wrap;
+}
+.btn-primary {
+  position: relative;
+  background: var(--c-signal);
+  color: var(--c-bg);
+  border: none;
+  padding: 16px 28px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 52px;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.btn-primary:hover { background: #ff4555; }
+.btn-primary:active { transform: translateY(1px); }
+.btn-primary:disabled {
+  background: var(--c-surface-hi);
+  color: var(--c-muted);
+  cursor: not-allowed;
+}
+.btn-primary:focus-visible {
+  outline: 2px solid var(--c-text);
+  outline-offset: 3px;
+}
+.btn-primary-arrow {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  transition: transform 0.2s ease;
+}
+.btn-primary:hover .btn-primary-arrow { transform: translateX(4px); }
+
+.status {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--c-muted-hi);
+  letter-spacing: 0.04em;
+  min-height: 18px;
+  display: none;
+}
+.status.show { display: inline-flex; align-items: center; gap: 8px; }
+.status.info { color: var(--c-signal); }
+.status.error { color: var(--c-no); }
+.status.error::before {
+  content: "✕";
+  font-weight: 700;
+}
+.status.info::before {
+  content: "›";
+  font-weight: 700;
+  color: var(--c-signal);
+}
+
+.dots::after {
+  content: '';
+  display: inline-block;
+  animation: dots 1.2s steps(4, end) infinite;
+}
+@keyframes dots {
+  0%, 20% { content: ''; }
+  40% { content: '.'; }
+  60% { content: '..'; }
+  80%, 100% { content: '...'; }
+}
+
+/* ===========================================================================
+   RESULTS
+   =========================================================================== */
+.results {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 24px var(--pad-x) 48px;
+  display: none;
+}
+.results.show {
+  display: block;
+  animation: fade-up 0.45s ease-out;
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.result-grade-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-hi);
+  padding: 36px;
+  display: flex;
+  align-items: center;
+  gap: 36px;
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+}
+.result-grade-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 20% 50%, var(--c-signal-glow), transparent 50%);
+  pointer-events: none;
+}
+.result-grade-letter {
+  font-family: var(--font-mono);
+  font-size: clamp(96px, 18vw, 144px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  position: relative;
+}
+.result-grade-meta { position: relative; flex: 1; }
+.result-grade-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  color: var(--c-muted-hi);
+  margin-bottom: 8px;
+}
+.result-grade-num {
+  font-family: var(--font-mono);
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--c-text);
+  letter-spacing: -0.02em;
+}
+.grade-denom {
+  color: var(--c-muted);
+  font-weight: 400;
+  font-size: 24px;
+}
+.result-grade-tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--c-signal);
+  margin-top: 12px;
+  text-transform: uppercase;
+}
+
+@media (max-width: 600px) {
+  .result-grade-card { flex-direction: column; align-items: flex-start; gap: 16px; padding: 28px 24px; }
+}
+
+.result-summary {
+  background: var(--c-bg-2);
+  border: 1px solid var(--c-border);
+  border-left: 3px solid var(--c-signal);
+  padding: 22px 28px;
+  margin-bottom: 36px;
+}
+.result-summary-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  color: var(--c-muted-hi);
+  margin-bottom: 10px;
+}
+.result-summary-body {
+  font-family: var(--font-serif);
+  font-size: 16.5px;
+  line-height: 1.55;
+  color: var(--c-text-dim);
+}
+
+.breakdown-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.breakdown-num {
+  font-family: var(--font-mono);
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--c-signal);
+  line-height: 1;
+}
+.breakdown-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--c-muted-hi);
+}
+
+.breakdown { display: flex; flex-direction: column; gap: 1px; background: var(--c-border); border: 1px solid var(--c-border); }
+.item {
+  background: var(--c-bg-2);
+  padding: 18px 22px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 18px;
+  align-items: baseline;
+}
+.item-label {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--c-text);
+}
+.badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  padding: 4px 10px;
+  white-space: nowrap;
+  align-self: start;
+}
+.badge.yes { background: rgba(111, 207, 114, 0.1); color: var(--c-yes); }
+.badge.partial { background: rgba(240, 180, 64, 0.1); color: var(--c-partial); }
+.badge.no { background: rgba(255, 51, 68, 0.1); color: var(--c-no); }
+.item-note {
+  grid-column: 1 / -1;
+  font-family: var(--font-serif);
+  font-size: 15px;
+  color: var(--c-text-dim);
+  line-height: 1.55;
+}
+.item-evidence {
+  grid-column: 1 / -1;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--c-muted-hi);
+  font-style: italic;
+  border-top: 1px dashed var(--c-border-hi);
+  padding-top: 10px;
+  margin-top: 6px;
+}
+
+/* ---- Disclaimer ---- */
+.disclaimer {
+  margin-top: 40px;
+  padding: 22px 28px;
+  background: rgba(255, 51, 68, 0.04);
+  border: 1px solid rgba(255, 51, 68, 0.25);
+  position: relative;
+}
+.disclaimer-tag {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--c-signal);
+  margin-bottom: 10px;
+}
+.disclaimer p {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 14.5px;
+  color: var(--c-text-dim);
+  line-height: 1.55;
+}
+.disclaimer strong { color: var(--c-text); }
+
+/* ===========================================================================
+   HOW IT WORKS
+   =========================================================================== */
+.how {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 64px var(--pad-x) 48px;
+}
+.how-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+@media (min-width: 760px) {
+  .how-grid { grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--c-border); border: 1px solid var(--c-border); }
+}
+.how-step {
+  background: var(--c-bg);
+  padding: 28px 24px;
+}
+@media (min-width: 760px) {
+  .how-step { padding: 32px 28px 36px; }
+}
+.how-step-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--c-signal);
+  margin-bottom: 18px;
+}
+.how-step h3 {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 10px;
+  color: var(--c-text);
+}
+.how-step p {
+  margin: 0;
+  font-size: 15px;
+  color: var(--c-text-dim);
+  line-height: 1.6;
+}
+
+/* ===========================================================================
+   RUBRIC TABLE
+   =========================================================================== */
+.rubric-section {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 48px var(--pad-x) 64px;
+}
+.rubric-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-serif);
+  font-size: 15px;
+  border: 1px solid var(--c-border);
+}
+.rubric-table th {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--c-muted-hi);
+  text-align: left;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--c-border-hi);
+  background: var(--c-bg-2);
+}
+.rubric-table td {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--c-border);
+  vertical-align: top;
+}
+.rubric-table tr:last-child td { border-bottom: none; }
+.rubric-table .crit { font-weight: 700; color: var(--c-text); white-space: nowrap; }
+.rubric-table .look { color: var(--c-text-dim); }
+.weight-col { text-align: right; }
+.rubric-table .weight {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--c-signal);
+  text-align: right;
+}
+
+@media (max-width: 640px) {
+  .rubric-table .look { display: none; }
+}
+
+.rubric-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 24px;
+  padding: 16px 18px;
+  background: var(--c-bg-2);
+  border: 1px solid var(--c-border);
+}
+.rubric-foot-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--c-text-dim);
+}
+.grade-pill {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 3px 9px;
+}
+.grade-pill-a { color: var(--c-grade-a); background: rgba(111, 207, 114, 0.1); }
+.grade-pill-b { color: var(--c-grade-b); background: rgba(168, 217, 106, 0.1); }
+.grade-pill-c { color: var(--c-grade-c); background: rgba(240, 180, 64, 0.1); }
+.grade-pill-d { color: var(--c-grade-d); background: rgba(240, 128, 64, 0.1); }
+.grade-pill-f { color: var(--c-grade-f); background: rgba(255, 51, 68, 0.1); }
+
+/* ===========================================================================
+   FOOTER
+   =========================================================================== */
+.site-footer {
+  border-top: 1px solid var(--c-border-hi);
+  background: var(--c-bg-2);
+  margin-top: 32px;
+}
+.footer-inner {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 40px var(--pad-x);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+}
+@media (min-width: 700px) {
+  .footer-inner { grid-template-columns: repeat(3, 1fr); }
+}
+.footer-col {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  color: var(--c-text-dim);
+}
+.footer-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  color: var(--c-muted);
+  margin-bottom: 8px;
+}
+.footer-col a {
+  color: var(--c-text);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.footer-col a:hover { color: var(--c-signal); }
+.footer-sub {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--c-muted);
+  margin-top: 6px;
+}
+
+/* ===========================================================================
+   ACCESSIBILITY
+   =========================================================================== */
+:focus-visible {
+  outline: 2px solid var(--c-signal);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .logo-mark, .preview-dot, .status-dot { animation: none; }
+}
+
+</style>
+</head>
+<body>
+
+<!-- Decorative scan line -->
+<div class="scanline" aria-hidden="true"></div>
+
+<!-- Top utility bar -->
+<header class="top-bar" role="banner">
+  <div class="top-bar-inner">
+    <div class="logo">
+      <span class="logo-mark" aria-hidden="true">◉</span>
+      <span class="logo-text">WhereIsMyData</span>
+    </div>
+    <div class="top-bar-meta">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span class="top-bar-status">LOCAL · NO SERVER · NO TRACKING</span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-grid">
+      <div class="hero-left">
+        <div class="hero-eyebrow">
+          <span class="eyebrow-num">01</span>
+          <span class="eyebrow-line" aria-hidden="true"></span>
+          <span class="eyebrow-text">CANADIAN PRIVACY SCAN</span>
+        </div>
+        <h1 class="hero-headline">
+          Read what they<br>
+          <span class="headline-strike">wrote about</span> <span class="headline-accent">about you.</span>
+        </h1>
+        <p class="hero-sub">
+          Privacy policies are long, dense, and written so you won't read them.
+          Paste one here. Claude reads it. You get an A–F grade against
+          PIPEDA's fair information principles in under thirty seconds.
+        </p>
+        <div class="hero-meta">
+          <div class="meta-item">
+            <span class="meta-label">COST</span>
+            <span class="meta-value">~$0.01</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">TIME</span>
+            <span class="meta-value">~20s</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">DATA SENT TO ME</span>
+            <span class="meta-value">none</span>
+          </div>
+        </div>
+      </div>
+      <aside class="hero-right" aria-label="Sample report preview">
+        <div class="preview-card">
+          <div class="preview-header">
+            <span class="preview-label">REPORT_PREVIEW</span>
+            <span class="preview-dot" aria-hidden="true"></span>
+          </div>
+          <div class="preview-grade-row">
+            <div class="preview-grade preview-grade-d">D</div>
+            <div class="preview-grade-info">
+              <div class="preview-grade-num">47<span>/100</span></div>
+              <div class="preview-grade-label">acme corp privacy policy</div>
+            </div>
+          </div>
+          <div class="preview-bars" role="list">
+            <div class="preview-bar" role="listitem"><span>accountability</span><span class="bar-status yes">YES</span></div>
+            <div class="preview-bar" role="listitem"><span>data location</span><span class="bar-status no">NO</span></div>
+            <div class="preview-bar" role="listitem"><span>retention</span><span class="bar-status partial">PARTIAL</span></div>
+            <div class="preview-bar" role="listitem"><span>third-party share</span><span class="bar-status no">NO</span></div>
+            <div class="preview-bar" role="listitem"><span>user rights</span><span class="bar-status yes">YES</span></div>
+          </div>
+          <div class="preview-redact" aria-hidden="true">
+            <span class="redact-block"></span>
+            <span class="redact-block redact-block-2"></span>
+            <span class="redact-block redact-block-3"></span>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- Tool -->
+  <section class="tool" id="tool">
+
+    <div class="section-head">
+      <span class="section-num">02</span>
+      <h2 class="section-title">THE SCANNER</h2>
+      <span class="section-rule" aria-hidden="true"></span>
+    </div>
+
+    <!-- API key -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-num">A</span>
+        <h3 class="panel-title">Your Anthropic API key</h3>
+      </div>
+      <p class="panel-hint">
+        Get one free from <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.
+        $5 signup credit covers ~500 scans. Your key stays in this browser tab,
+        goes directly to Anthropic, never touches my server because there
+        <em>is</em> no server.
+      </p>
+      <div class="input-wrap">
+        <label class="visually-hidden" for="apiKey">Anthropic API key</label>
+        <input
+          type="password"
+          id="apiKey"
+          placeholder="sk-ant-•••"
+          autocomplete="off"
+          spellcheck="false"
+          aria-describedby="keyStatus"
+        >
+      </div>
+      <div class="panel-foot">
+        <span id="keyStatus" class="key-status" aria-live="polite">No key entered.</span>
+        <div class="panel-actions">
+          <button type="button" class="btn-text" id="toggleKey" aria-pressed="false">show</button>
+          <button type="button" class="btn-text" id="rememberKey">remember</button>
+          <button type="button" class="btn-text" id="clearKey">clear</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Policy -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-num">B</span>
+        <h3 class="panel-title">Privacy policy text</h3>
+      </div>
+      <p class="panel-hint">
+        Open the company's policy in another tab. Select all
+        (<kbd>Ctrl</kbd>+<kbd>A</kbd>), copy (<kbd>Ctrl</kbd>+<kbd>C</kbd>),
+        paste here. The longer the better — most policies are 2,000 to 20,000 words.
+      </p>
+      <div class="input-wrap">
+        <label class="visually-hidden" for="policyText">Privacy policy text</label>
+        <textarea
+          id="policyText"
+          placeholder="Paste the privacy policy text here..."
+          aria-describedby="charCount"
+        ></textarea>
+      </div>
+      <div class="panel-foot">
+        <span class="char-count"><span id="charCount">0</span> chars</span>
+        <button type="button" class="btn-text" id="loadSampleBtn">load sample</button>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-row">
+      <button class="btn-primary" id="scanBtn" type="button">
+        <span class="btn-primary-text">RUN SCAN</span>
+        <span class="btn-primary-arrow" aria-hidden="true">→</span>
+      </button>
+      <div class="status" id="status" role="status" aria-live="polite"></div>
+    </div>
+
+  </section>
+
+  <!-- Results -->
+  <section class="results" id="results" aria-live="polite">
+
+    <div class="section-head">
+      <span class="section-num">03</span>
+      <h2 class="section-title">REPORT</h2>
+      <span class="section-rule" aria-hidden="true"></span>
+    </div>
+
+    <div class="result-grade-card">
+      <div class="result-grade-letter" id="gradeLetter">—</div>
+      <div class="result-grade-meta">
+        <div class="result-grade-label">OVERALL SCORE</div>
+        <div class="result-grade-num"><span id="scoreNum">0</span><span class="grade-denom">/100</span></div>
+        <div class="result-grade-tag" id="gradeTag"></div>
+      </div>
+    </div>
+
+    <div class="result-summary">
+      <div class="result-summary-label">SUMMARY</div>
+      <div id="summaryBox" class="result-summary-body"></div>
+    </div>
+
+    <div class="breakdown-head">
+      <span class="breakdown-num">11</span>
+      <span class="breakdown-title">CRITERIA · PIPEDA FAIR INFORMATION PRINCIPLES</span>
+    </div>
+    <div id="breakdown" class="breakdown"></div>
+
+    <div class="disclaimer">
+      <div class="disclaimer-tag">⚠ AI · NOT LEGAL ADVICE</div>
+      <p>
+        Claude can miss disclosures buried in linked sub-policies, misread legal
+        hedging, or get a status wrong on a vague disclosure. Before citing this
+        grade publicly or making a decision based on it,
+        <strong>read the original policy yourself and verify every claim</strong>.
+        This is a first-pass reader, not a compliance audit.
+      </p>
+    </div>
+
+  </section>
+
+  <!-- How it works -->
+  <section class="how">
+    <div class="section-head">
+      <span class="section-num">04</span>
+      <h2 class="section-title">HOW IT WORKS</h2>
+      <span class="section-rule" aria-hidden="true"></span>
+    </div>
+    <div class="how-grid">
+      <div class="how-step">
+        <div class="how-step-num">01</div>
+        <h3>Paste the policy</h3>
+        <p>Open the company's privacy policy in another tab. Copy the text. Paste it into the scanner. No URL fetching, no scraping — you're in control of what gets read.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-step-num">02</div>
+        <h3>Claude reads it</h3>
+        <p>Your browser sends the policy plus a rubric grounded in PIPEDA's ten fair information principles to Claude Haiku. Claude scores eleven criteria as yes, partial, or no.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-step-num">03</div>
+        <h3>You get a report</h3>
+        <p>Weighted score becomes a letter grade. Each criterion gets a one-line note plus a short evidence quote. Disclaimer attached. The whole loop runs in your browser tab.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Rubric -->
+  <section class="rubric-section">
+    <div class="section-head">
+      <span class="section-num">05</span>
+      <h2 class="section-title">THE RUBRIC</h2>
+      <span class="section-rule" aria-hidden="true"></span>
+    </div>
+    <table class="rubric-table">
+      <thead>
+        <tr>
+          <th scope="col">CRITERION</th>
+          <th scope="col">WHAT WE LOOK FOR</th>
+          <th scope="col" class="weight-col">WEIGHT</th>
+        </tr>
+      </thead>
+      <tbody id="rubricBody"></tbody>
+    </table>
+    <div class="rubric-foot">
+      <div class="rubric-foot-item"><span class="grade-pill grade-pill-a">A</span> 85+</div>
+      <div class="rubric-foot-item"><span class="grade-pill grade-pill-b">B</span> 70–84</div>
+      <div class="rubric-foot-item"><span class="grade-pill grade-pill-c">C</span> 55–69</div>
+      <div class="rubric-foot-item"><span class="grade-pill grade-pill-d">D</span> 40–54</div>
+      <div class="rubric-foot-item"><span class="grade-pill grade-pill-f">F</span> &lt; 40</div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-col">
+      <div class="footer-label">BUILT BY</div>
+      <a href="https://www.linkedin.com/in/brar-gursharan13/" target="_blank" rel="noopener">Gursharan Brar</a>
+      <div class="footer-sub">SAIT · Calgary, AB</div>
+    </div>
+    <div class="footer-col">
+      <div class="footer-label">SOURCE</div>
+      <a href="https://github.com/gursharan-brar/whereismydata" target="_blank" rel="noopener">github.com/gursharan-brar</a>
+      <div class="footer-sub">MIT licensed</div>
+    </div>
+    <div class="footer-col">
+      <div class="footer-label">NO ANALYTICS</div>
+      <span>No tracking. No cookies.</span>
+      <div class="footer-sub">View source · verify yourself</div>
+    </div>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

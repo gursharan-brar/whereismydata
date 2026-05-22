@@ -1,0 +1,69 @@
+# 50 Canadian-relevant companies to scan
+# Edit this list before running --batch. Mix of:
+#   - Big CA brands  - Calgary tech  - SaaS Canadians use daily
+
+# ---- Big Canadian brands
+https://www.timhortons.ca
+https://www.lululemon.com
+https://www.canadiantire.ca
+https://www.shoppersdrugmart.ca
+https://www.loblaws.ca
+https://www.sobeys.com
+https://www.canadagoose.com
+https://www.rbc.com
+https://www.td.com
+https://www.scotiabank.com
+
+# ---- Canadian tech
+https://www.shopify.com
+https://www.hootsuite.com
+https://www.lightspeedhq.com
+https://www.wealthsimple.com
+https://www.koho.ca
+https://www.neo.cc
+https://www.thinkific.com
+https://www.clio.com
+https://www.dialpad.com
+https://www.coveo.com
+
+# ---- Telecom / utilities
+https://www.telus.com
+https://www.bell.ca
+https://www.rogers.com
+https://www.freedommobile.ca
+https://www.enmax.com
+
+# ---- Calgary-rooted
+https://www.westjet.com
+https://www.parkland.ca
+https://www.suncor.com
+https://www.cenovus.com
+https://www.atb.com
+
+# ---- SaaS Canadians actually use
+https://www.notion.com
+https://www.figma.com
+https://www.slack.com
+https://www.zoom.us
+https://www.canva.com
+https://www.dropbox.com
+https://www.linkedin.com
+https://www.spotify.com
+https://www.netflix.com
+https://www.airbnb.ca
+
+# ---- Government / public sector adjacent
+https://www.canada.ca
+https://www.alberta.ca
+https://www.calgary.ca
+https://www.cra-arc.gc.ca
+
+# ---- Education
+https://www.sait.ca
+https://www.ucalgary.ca
+https://www.mtroyal.ca
+
+# ---- Healthcare / pharmacy
+https://www.alberta.bluecross.ca
+https://www.well.ca
+https://www.maple.ca
